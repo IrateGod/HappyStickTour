@@ -4,7 +4,78 @@ require_once 'Database.php';
 
 class OsuApi {
   public function getBeatmap($beatmapId) {
+    $database = new Database();
+    $db = $database->getConnection();
 
+    $stmt = $db->prepare('SELECT beatmap_id as beatmapId, beatmapset_id as beatmapsetId, title, artist, version, cover, preview_url as previewUrl, total_length as totalLength, bpm, count_circles as countCircles, count_sliders as countSliders, cs, drain, accuracy, ar, difficulty_rating as difficultyRating
+      FROM osu_beatmaps
+      WHERE beatmap_id = :beatmap_id');
+    $stmt->bindValue(':beatmap_id', $beatmapId, PDO::PARAM_INT);
+    $stmt->execute();
+    $rows = $stmt->fetchAll(PDO::FETCH_OBJ);
+    $returnValue = new StdClass;
+    if (!isset($rows[0])) {
+      $curl = curl_init();
+      curl_setopt_array($curl, array(
+          CURLOPT_SSL_VERIFYPEER => 0,
+          CURLOPT_RETURNTRANSFER => 1,
+          CURLOPT_FOLLOWLOCATION => 1,
+          CURLOPT_URL => 'https://osu.ppy.sh/beatmaps/' . $beatmapId
+        )
+      );
+      $html = curl_exec($curl);
+      curl_close($curl);
+      $dom = new DOMDocument();
+      @$dom->loadHTML($html);
+      $beatmapset = json_decode($dom->getElementById('json-beatmapset')->textContent);
+      foreach ($beatmapset->beatmaps as $value) {
+        if ($value->id == $beatmapId) {
+          $beatmap = $value;
+          break;
+        }
+      }
+
+      $returnValue->beatmapId = $beatmap->id;
+      $returnValue->beatmapsetId = $beatmapset->id;
+      $returnValue->title = $beatmapset->title;
+      $returnValue->artist = $beatmapset->artist;
+      $returnValue->version = $beatmap->version;
+      $returnValue->cover = $beatmapset->covers->{'cover@2x'};
+      $returnValue->previewUrl = $beatmapset->preview_url;
+      $returnValue->totalLength = $beatmap->total_length;
+      $returnValue->bpm = $beatmapset->bpm;
+      $returnValue->countCircles = $beatmap->count_circles;
+      $returnValue->countSliders = $beatmap->count_sliders;
+      $returnValue->cs = $beatmap->cs;
+      $returnValue->drain = $beatmap->drain;
+      $returnValue->accuracy = $beatmap->accuracy;
+      $returnValue->ar = $beatmap->ar;
+      $returnValue->difficultyRating = $beatmap->difficulty_rating;
+
+      $stmt = $db->prepare('INSERT INTO osu_beatmaps (beatmap_id, beatmapset_id, title, artist, version, cover, preview_url, total_length, bpm, count_circles, count_sliders, cs, drain, accuracy, ar, difficulty_rating)
+        VALUES (:beatmap_id, :beatmapset_id, :title, :artist, :version, :cover, :preview_url, :total_length, :bpm, :count_circles, :count_sliders, :cs, :drain, :accuracy, :ar, :difficulty_rating)');
+      $stmt->bindValue(':beatmap_id', $returnValue->beatmapId, PDO::PARAM_INT);
+      $stmt->bindValue(':beatmapset_id', $returnValue->beatmapsetId, PDO::PARAM_INT);
+      $stmt->bindValue(':title', $returnValue->title, PDO::PARAM_STR);
+      $stmt->bindValue(':artist', $returnValue->artist, PDO::PARAM_STR);
+      $stmt->bindValue(':version', $returnValue->version, PDO::PARAM_STR);
+      $stmt->bindValue(':cover', $returnValue->cover, PDO::PARAM_STR);
+      $stmt->bindValue(':preview_url', $returnValue->previewUrl, PDO::PARAM_STR);
+      $stmt->bindValue(':total_length', $returnValue->totalLength, PDO::PARAM_INT);
+      $stmt->bindValue(':bpm', $returnValue->bpm, PDO::PARAM_STR);
+      $stmt->bindValue(':count_circles', $returnValue->countCircles, PDO::PARAM_INT);
+      $stmt->bindValue(':count_sliders', $returnValue->countSliders, PDO::PARAM_INT);
+      $stmt->bindValue(':cs', $returnValue->cs, PDO::PARAM_STR);
+      $stmt->bindValue(':drain', $returnValue->drain, PDO::PARAM_STR);
+      $stmt->bindValue(':accuracy', $returnValue->accuracy, PDO::PARAM_INT);
+      $stmt->bindValue(':ar', $returnValue->ar, PDO::PARAM_STR);
+      $stmt->bindValue(':difficulty_rating', $returnValue->difficultyRating, PDO::PARAM_STR);
+      $stmt->execute();
+    } else {
+      $returnValue = $rows[0];
+    }
+
+    return $returnValue;
   }
 
   public function getUser($userId) {
