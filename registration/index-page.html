@@ -1,0 +1,106 @@
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+
+<dom-module id="index-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			app-header {
+				background-color: var(--discord-grey);
+				color: white;
+			}
+			paper-icon-button {
+				color: white;
+			}
+			.wrapper {
+				margin: 20px;
+			}
+			.heading {
+				font-size: 40px;
+				color: var(--happystick-green);
+				margin-bottom: 20px;
+			}
+			.search-wrapper {
+				flex-shrink: 0;
+				margin-top: 20px;
+			}
+			.search-input {
+				--paper-input-container-focus-color: var(--happystick-green);
+			}
+			.search-button {
+				background-color: var(--happystick-green);
+				color: white;
+				height: 35px;
+				margin-top: 15px;
+			}
+			.tier-wrapper {
+				flex-shrink: 0;
+				margin-top: 10px;
+			}
+		</style>
+		<iron-ajax id="osuProfileAjax" url="../api/osu_profile/" method="GET" last-response="{{osuProfile}}"></iron-ajax>
+		<iron-ajax id="getTiersAjax" url="../api/tiers" method="GET" last-response="{{tiers}}" auto></iron-ajax>
+		<app-header-layout>
+			<app-header slot="header">
+				<app-toolbar>
+					<div main-title>Registration</div>
+				</app-toolbar>
+			</app-header>
+			<div class="flex layout vertical wrapper">
+				<div class="heading">HAPPYSTICK FALL TOUR REGISTRATION</div>
+				<div>Welcome to the HappyStick Fall Tour Registration!</div>
+				<div>By going through the previous page you've registered on our site with your Discord account. Input your osu! username below to link your osu! account with our site and to register for the Fall Tour.</div>
+				<div class="text">There are a limited amount of slots so the earlier you register, the more likely you'll make it in! You can come back here to check if you've been accepted when the clock strikes July 12th UTC.</div>
+				<div class="text">If your registration is accepted you will be automatically assigned the appropriate Discord role on our server.</div>
+				<div class="text">For an in-depth look into how the Fall Tour is run take a look at <a href="https://google.com" target="_blank">this document.</a> Here you'll find an overview of the prizepool, format, rules, etc.</div>
+				<div class="layout horizontal search-wrapper">
+					<paper-input class="search-input" label="osu! ID or Username" value="{{osuId}}" on-keydown="_searchKeyDown"></paper-input>
+					<paper-button class="search-button" raised on-click="_searchOsuProfile">Search</paper-button>
+				</div>
+				<osu-profile avatar-url="[[osuProfile.avatarUrl]]" username="[[osuProfile.username]]" pp="[[osuProfile.pp]]" hit-accuracy="[[osuProfile.hitAccuracy]]" play-count="[[osuProfile.playCount]]" level="[[osuProfile.level]]" rank="[[osuProfile.rank]]"></osu-profile>
+				<template is="dom-if" if="[[tier]]">
+					<div class="layout horizontal tier-wrapper">
+						<div>Your tier: <span>[[tier.name]]</span></div>
+					</div>
+				</template>
+			</div>
+		</app-header-layout>
+	</template>
+	<script>
+		class IndexPage extends Polymer.Element {
+			static get is() { return 'index-page' }
+
+			static get properties() {
+				return {
+					osuProfile: {
+						type: Object,
+						observer: '_osuProfileChanged'
+					}
+				}
+			}
+
+			_searchKeyDown(e) {
+				if (e.keyCode == 13) {
+					this._searchOsuProfile();
+				}
+			}
+
+			_searchOsuProfile() {
+				this.$.osuProfileAjax.url = '../api/osu_profile/' + this.osuId;
+				this.$.osuProfileAjax.generateRequest();
+			}
+
+			_osuProfileChanged(e) {
+				this.tier = null;
+				for (var i = 0; i < this.tiers.length; i++) {
+					if (parseInt(e.rank) >= parseInt(this.tiers[i].lowerEndpoint) && parseInt(e.rank) <= parseInt(this.tiers[i].upperEndpoint)) {
+						this.tier = this.tiers[i];
+					}
+				}
+				if (!this.tier) {
+					this.tier = { name: 'No tier found' };
+				}
+			}
+		}
+
+		window.customElements.define(IndexPage.is, IndexPage);
+	</script>
+</dom-module>

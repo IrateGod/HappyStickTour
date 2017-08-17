@@ -1,0 +1,78 @@
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+
+<dom-module id="osu-profile">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			.wrapper {
+				height: 100px;
+				width: 400px;
+				background-color: #090909;
+				position: relative;
+			}
+			.image {
+				position: absolute;
+				height: 90px;
+				width: 90px;
+				top: 5px;
+				left: 5px;
+				background-size: 90px 90px;
+			}
+			.username, .pp, .acc, .playcount {
+				position: absolute;
+				color: white;
+				left: 100px;
+			}
+			.pp, .acc, .playcount {
+				font-size: 14px;
+			}
+			.username {
+				font-size: 20px;
+				top: 5px;
+			}
+			.pp {
+				top: 32px;
+			}
+			.acc {
+				top: 50px;
+			}
+			.playcount {
+				top: 68px;
+			}
+			.rank {
+				position: absolute;
+				right: 5px;
+				bottom: 5px;
+				color: white;
+				font-size: 40px;
+				opacity: 0.5;
+			}
+		</style>
+		<div class="wrapper">
+			<div class="image" style="background-image:url('[[avatarUrl]]');"></div>
+			<div class="username">[[username]]</div>
+			<div class="pp">Performance: <span>[[pp]]</span>pp</div>
+			<div class="acc">Accuracy: <span>[[hitAccuracy]]</span>%</div>
+			<div class="playcount">Play Count: <span>[[playCount]]</span> (LV<span>[[level]]</span>)</div>
+			<div class="rank">#<span>[[rank]]</span></div>
+		</div>
+	</template>
+	<script>
+		class OsuProfile extends Polymer.Element {
+			static get is() { return 'osu-profile' }
+
+			static get properties() {
+				return {
+					avatarUrl: String,
+					username: String,
+					pp: Number,
+					hitAccuracy: Number,
+					playCount: Number,
+					level: Number,
+					rank: Number
+				}
+			}
+		}
+
+		window.customElements.define(OsuProfile.is, OsuProfile);
+	</script>
+</dom-module>

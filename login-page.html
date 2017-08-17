@@ -1,0 +1,53 @@
+<link rel="import" href="bower_components/polymer/polymer-element.html">
+
+<dom-module id="login-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			:root {
+				height: 100%;
+				background-image: url('images/index_header.png');
+				background-repeat: no-repeat;
+				background-size: 100% auto;
+			}
+			.staff-login-button {
+				margin: 20px;
+				background-color: var(--discord-grey);
+				color: white;
+			}
+			.discord-login-button, .public-login-button {
+				margin-bottom: 100px;
+				background-color: var(--happystick-green);
+				color: white;
+			}
+			.public-login-button {
+				margin-left: 200px;
+			}
+		</style>
+		<div class="flex layout vertical">
+			<div class="layout horizontal">
+				<div class="flex"></div>
+				<paper-button class="staff-login-button" raised on-click="discordLogin">Staff login</paper-button>
+			</div>
+			<div class="flex"></div>
+			<div class="layout horizontal">
+				<div class="flex"></div>
+				<paper-button class="discord-login-button" raised on-click="discordLogin">Player login</paper-button>
+				<paper-button class="public-login-button" raised on-click="publicLogin">Public Stats</paper-button>
+				<div class="flex"></div>
+			</div>
+		</div>
+	</template>
+	<script>
+		class LoginPage extends Polymer.Element {
+			static get is() { return 'login-page' }
+
+			static get properties() {
+				return {
+
+				};
+			}
+		}
+
+		window.customElements.define(LoginPage.is, LoginPage);
+	</script>
+</dom-module>

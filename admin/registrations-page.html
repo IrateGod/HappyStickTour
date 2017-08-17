@@ -1,0 +1,174 @@
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+
+<dom-module id="registrations-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			paper-checkbox {
+				--paper-checkbox-checked-color: var(--happystick-green);
+			}
+			paper-input {
+				--paper-input-container-focus-color: var(--happystick-green);
+			}
+			vaadin-date-picker {
+				margin-left: 10px;
+				margin-top: 25px;
+				margin-left: 10px;
+			}
+			.action-wrapper {
+				flex-shrink: 0;
+			}
+			.wrapper {
+				margin: 10px;
+			}
+			.header {
+				font-size: 30px;
+				color: var(--happystick-green);
+			}
+			.action-button {
+				background-color: var(--happystick-green);
+				color: white;
+				margin: 10px;
+				flex-shrink: 0;
+			}
+			.list-wrapper {
+				width: 500px;
+				padding: 10px;
+			}
+			.edit-section {
+				margin-top: 10px;
+				margin-bottom: 10px;
+				flex-shrink: 0;
+			}
+			.time-input {
+				width: 30px;
+				margin-left: 10px;
+			}
+			#errorToast {
+				--paper-toast-background-color: var(--error-red);
+			}
+		</style>
+		<iron-ajax id="getSettingsAjax" url="../api/settings" method="GET" on-response="_settingsResponse" auto></iron-ajax>
+		<iron-ajax id="putSettingsAjax" url="../api/settings" method="PUT" content-type="application/json" on-response="_putSettingsResponse"></iron-ajax>
+		<div class="wrapper layout vertical">
+			<div class="header">Settings</div>
+			<div class="edit-section">
+				<paper-checkbox checked="{{registrationsOpen}}">Registrations open</paper-checkbox>
+			</div>
+			<div class="edit-section">
+				<template is="dom-if" if="[[registrationsOpen]]" on-dom-change="_settingsCreated">
+					<div class="layout horizontal">
+						<vaadin-date-picker placeholder="Date" id="fromDatePicker" value="{{dateFrom}}"></vaadin-date-picker>
+						<paper-input class="time-input" value="{{hourFrom}}"></paper-input>
+						<div style="margin-top:30px;margin-left:10px;">:</div>
+						<paper-input class="time-input" value="{{minutesFrom}}"></paper-input>
+						<div style="margin-top:30px;margin-left:10px;">UTC</div>
+					</div>
+					<div class="layout horizontal">
+						<vaadin-date-picker placeholder="Date" id="toDatePicker" value="{{dateTo}}"></vaadin-date-picker>
+						<paper-input class="time-input" value="{{hourTo}}"></paper-input>
+						<div style="margin-top:30px;margin-left:10px;">:</div>
+						<paper-input class="time-input" value="{{minutesTo}}"></paper-input>
+						<div style="margin-top:30px;margin-left:10px;">UTC</div>
+					</div>
+				</template>
+			</div>
+			<div class="action-wrapper layout horizontal">
+				<paper-button class="action-button" raised on-click="_saveSettings">Save</paper-button>
+			</div>
+			<div class="header">Registrations</div>
+			<div class="layout horizontal">
+				<div class="list-wrapper layout vertical">
+
+				</div>
+			</div>
+		</div>
+		<paper-toast id="successToast" text="[[message]]"></paper-toast>
+		<paper-toast id="errorToast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class RegistrationsPage extends Polymer.Element {
+			static get is() { return 'registrations-page' }
+
+			static get properties() {
+				return {
+
+				}
+			}
+
+			_settingsCreated() {
+				this.shadowRoot.querySelector('#fromDatePicker').set('i18n.formatDate', function(d) {
+					return [d.getFullYear(), ('00' + (d.getMonth() + 1)).slice(-2), ('00' + d.getDate()).slice(-2)].join('-');
+				});
+				this.shadowRoot.querySelector('#fromDatePicker').set('i18n.parseDate', function(text) {
+					var parts = text.split('-');
+					if (parts.length === 3) {
+						var date = new Date(0, 0);
+						date.setFullYear(parseInt(parts[0]));
+						date.setMonth(parseInt(parts[1]) - 1);
+						date.setDate(parseInt(parts[2]));
+						return date;
+					}
+				});
+				this.shadowRoot.querySelector('#fromDatePicker').set('i18n.firstDayOfWeek', 1);
+				this.shadowRoot.querySelector('#toDatePicker').set('i18n.formatDate', function(d) {
+					return [d.getFullYear(), ('00' + (d.getMonth() + 1)).slice(-2), ('00' + d.getDate()).slice(-2)].join('-');
+				});
+				this.shadowRoot.querySelector('#toDatePicker').set('i18n.parseDate', function(text) {
+					var parts = text.split('-');
+					if (parts.length === 3) {
+						var date = new Date(0, 0);
+						date.setFullYear(parseInt(parts[0]));
+						date.setMonth(parseInt(parts[1]) - 1);
+						date.setDate(parseInt(parts[2]));
+						return date;
+					}
+				});
+				this.shadowRoot.querySelector('#toDatePicker').set('i18n.firstDayOfWeek', 1);
+			}
+
+			_settingsResponse(e) {
+				var response = e.detail.response;
+				this.registrationsOpen = response.registrationsOpen == '1';
+				if (response.registrationsFrom) {
+					this.dateFrom = response.registrationsFrom.split(' ')[0];
+					this.hourFrom = response.registrationsFrom.split(' ')[1].split(':')[0];
+					this.minutesFrom = response.registrationsFrom.split(' ')[1].split(':')[1];
+				} else {
+					this.dateFrom = null;
+					this.hourFrom = '00';
+					this.minutesFrom = '00';
+				}
+				if (response.registrationsTo) {
+					this.dateTo = response.registrationsTo.split(' ')[0];
+					this.hourTo = response.registrationsTo.split(' ')[1].split(':')[0];
+					this.minutesTo = response.registrationsTo.split(' ')[1].split(':')[1];
+				} else {
+					this.dateTo = null;
+					this.hourTo = '00';
+					this.minutesTo = '00';
+				}
+			}
+
+			_saveSettings() {
+				this.$.putSettingsAjax.body = {
+					'registrationsOpen': this.registrationsOpen,
+					'registrationsFrom': this.dateFrom + ' ' + ('00' + this.hourFrom).slice(-2) + ':' + ('00' + this.minutesFrom).slice(-2),
+					'registrationsTo': this.dateTo + ' ' + ('00' + this.hourTo).slice(-2) + ':' + ('00' + this.minutesTo).slice(-2)
+				};
+				this.$.putSettingsAjax.generateRequest();
+			}
+
+			_putSettingsResponse(e) {
+				var response = e.detail.response;
+				this.message = response.message;
+				if (response.error == '1') {
+					this.$.errorToast.open();
+				} else {
+					this.$.successToast.open();
+				}
+			}
+		}
+
+		window.customElements.define(RegistrationsPage.is, RegistrationsPage);
+	</script>
+</dom-module>

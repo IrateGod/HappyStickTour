@@ -1,0 +1,257 @@
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+
+<dom-module id="tiers-page">
+	<template>
+		<style include="iron-flex iron-flex-alignment">
+			paper-checkbox {
+				--paper-checkbox-checked-color: var(--happystick-green);
+			}
+			paper-input {
+				--paper-input-container-focux-color: var(--happystick-green);
+			}
+			paper-radio-button {
+				display: inline-block;
+				--paper-radio-button-checked-color: var(--happystick-green);
+				--paper-radio-button-checked-ink-color: var(--happystick-green);
+			}
+			.list-wrapper, .edit-wrapper {
+				width: 500px;
+				padding: 10px;
+			}
+			.header {
+				font-size: 30px;
+				color: var(--happystick-green);
+			}
+			.add-button, .action-button {
+				background-color: var(--happystick-green);
+				color: white;
+				margin: 10px;
+				flex-shrink: 0;
+			}
+			.edit-section {
+				margin-top: 10px;
+				margin-bottom: 10px;
+				flex-shrink: 0;
+			}
+			#errorToast {
+				--paper-toast-background-color: var(--error-red);
+			}
+		</style>
+		<iron-ajax id="getRoundsAjax" url="../api/rounds" method="GET" on-response="_roundsResponse" auto></iron-ajax>
+		<iron-ajax id="getTiersAjax" url="../api/tiers" method="GET" last-response="{{tiers}}" auto></iron-ajax>
+		<iron-ajax id="postTierAjax" url="../api/tiers" method="POST" content-type="application/json" on-response="_postTierResponse"></iron-ajax>
+		<iron-ajax id="putTierAjax" url="../api/tiers" method="PUT" content-type="application/json" on-response="_putTierResponse"></iron-ajax>
+		<iron-ajax id="deleteTierAjax" url="../api/tiers" method="DELETE" on-response="_deleteTierResponse"></iron-ajax>
+		<div class="wrapper layout horizontal">
+			<div class="list-wrapper layout vertical">
+				<div class="header">Tiers</div>
+				<vaadin-grid class="tiers-grid" items="[[tiers]]" active-item="{{selectedTier}}">
+					<vaadin-grid-column width="50px" flex-grow="0">
+						<template class="header">#</template>
+						<template>[[item.id]]</template>
+					</vaadin-grid-column>
+					<vaadin-grid-column width="50px">
+						<template class="header">Name</template>
+						<template>[[item.name]]</template>
+					</vaadin-grid-column>
+				</vaadin-grid>
+				<paper-icon-button icon="add" class="add-button" on-click="_addTier"></paper-icon-button>
+			</div>
+			<div class="edit-wrapper layout vertical">
+				<div hidden$="[[!editVisible]]">
+					<div hidden$="[[!isNewTier]]">
+						<div class="header">New Tier</div>
+					</div>
+					<div hidden$="[[isNewTier]]">
+						<div class="header">Edit Tier</div>
+					</div>
+					<div class="edit-section">
+						<paper-input label="Name" value="{{name}}"></paper-input>
+					</div>
+					<div class="edit-section layout horizontal">
+						<paper-input label="Lower Endpoint" value="{{lowerEndpoint}}"></paper-input>
+						<div style="margin-top:30px;margin-left:10px;margin-right:10px;">-</div>
+						<paper-input label="Upper Endpoint" value="{{upperEndpoint}}"></paper-input>
+					</div>
+					<div class="edit-section">
+						<paper-dropdown-menu label="Starting Round">
+							<paper-listbox slot="dropdown-content" selected="{{startingRound}}" attr-for-selected="value">
+								<template is="dom-repeat" items="[[rounds]]" as="round">
+									<paper-item value="[[round]]">[[round.name]]</paper-item>
+								</template>
+							</paper-listbox>
+						</paper-dropdown-menu>
+					</div>
+					<div class="edit-section">
+						<paper-radio-group selected="{{selectedSeeding}}">
+							<paper-radio-button name="rank">Seed by Rank</paper-radio-button>
+							<paper-radio-button name="time">Seed by Time</paper-radio-button>
+							<paper-radio-button name="random">Seed by Random</paper-radio-button>
+						</paper-radio-group>
+					</div>
+					<div class="edit-section">
+						<paper-checkbox checked="{{subBonus}}">Sub Bonus</paper-checkbox>
+					</div>
+					<div class="layout horizontal">
+						<paper-button class="action-button" raised on-click="_saveTier">Save</paper-button>
+						<div hidden$="[[isNewTier]]">
+							<paper-button class="action-button" raised on-click="_deleteTier">Delete</paper-button>
+						</div>
+						<paper-button class="action-button" raised on-click="_cancelTier">Cancel</paper-button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<paper-toast id="successToast" text="[[message]]"></paper-toast>
+		<paper-toast id="errorToast" text="[[message]]"></paper-toast>
+	</template>
+	<script>
+		class TiersPage extends Polymer.Element {
+			static get is() { return 'tiers-page' }
+
+			static get properties() {
+				return {
+					editVisible: {
+						type: Boolean,
+						value: false
+					},
+					isNewTier: {
+						type: Boolean,
+						value: false
+					},
+					selectedTier: {
+						observer: '_selectedTierChanged'
+					}
+				}
+			}
+
+			_roundsResponse(e) {
+				var response = e.detail.response;
+				this.rounds = [];
+				for (var i = 0; i < response.length; i++) {
+					if (response[i].isStartRound == '1') {
+						this.push('rounds', response[i]);
+					}
+				}
+			}
+
+			_addTier() {
+				this._resetEditor();
+				this.editVisible = true;
+				this.selectedSeeding = 'time';
+				this.isNewTier = true;
+			}
+
+			_resetEditor() {
+				this.id = null;
+				this.name = null;
+				this.lowerEndpoint = null;
+				this.upperEndpoint = null;
+				this.startingRound = null;
+				this.selectedSeeding = null;
+				this.subBonus = true;
+			}
+
+			_cancelTier() {
+				this.editVisible = false;
+			}
+
+			_saveTier() {
+				if (this.isNewTier) {
+					this.$.postTierAjax.body = {
+						'name': this.name,
+						'lowerEndpoint': this.lowerEndpoint,
+						'upperEndpoint': this.upperEndpoint,
+						'startingRound': this.startingRound.id,
+						'selectedSeeding': this.selectedSeeding,
+						'subBonus': this.subBonus
+					}
+					this.$.postTierAjax.generateRequest();
+				} else {
+					this.$.putTierAjax.url = '../api/tiers/' + this.id;
+					this.$.putTierAjax.body = {
+						'name': this.name,
+						'lowerEndpoint': this.lowerEndpoint,
+						'upperEndpoint': this.upperEndpoint,
+						'startingRound': this.startingRound.id,
+						'selectedSeeding': this.selectedSeeding,
+						'subBonus': this.subBonus
+					}
+					this.$.putTierAjax.generateRequest();
+				}
+			}
+
+			_selectedTierChanged(e) {
+				if (e) {
+					this._resetEditor();
+					this.id = e.id;
+					this.name = e.name;
+					this.lowerEndpoint = e.lowerEndpoint;
+					this.upperEndpoint = e.upperEndpoint;
+					for (var i = 0; i < this.rounds.length; i++) {
+						if (this.rounds[i].id == e.startingRound) {
+							this.startingRound = this.rounds[i];
+						}
+					}
+					this.subBonus = e.subBonus == '1';
+					if (e.seedByTime == '1') {
+						this.selectedSeeding = 'time';
+					} else if (e.seedByRank == '1') {
+						this.selectedSeeding = 'rank';
+					} else if (e.seedByRandom == '1') {
+						this.selectedSeeding = 'random';
+					} else {
+						this.selectedSeeding = 'rank';
+					}
+					this.isNewTier = false;
+					this.editVisible = true;
+				}
+			}
+
+			_deleteTier() {
+				if (this.id && !this.isNewTier) {
+					this.$.deleteTierAjax.url = '../api/tiers/' + this.id;
+					this.$.deleteTierAjax.generateRequest();
+				}
+			}
+
+			_postTierResponse(e) {
+				var response = e.detail.response;
+				this.message = response.message;
+				if (response.error == '1') {
+					this.$.errorToast.open();
+				} else {
+					this.$.successToast.open();
+					this.editVisible = false;
+					this.$.getTiersAjax.generateRequest();
+				}
+			}
+
+			_putTierResponse(e) {
+				var response = e.detail.response;
+				this.message = response.message;
+				if (response.error == '1') {
+					this.$.errorToast.open();
+				} else {
+					this.$.successToast.open();
+					this.editVisible = false;
+					this.$.getTiersAjax.generateRequest();
+				}
+			}
+
+			_deleteTierResponse(e) {
+				var response = e.detail.response;
+				this.message = response.message;
+				if (response.error == '1') {
+					this.$.errorToast.open();
+				} else {
+					this.$.successToast.open();
+					this.editVisible = false;
+					this.$.getTiersAjax.generateRequest();
+				}
+			}
+		}
+
+		window.customElements.define(TiersPage.is, TiersPage);
+	</script>
+</dom-module>

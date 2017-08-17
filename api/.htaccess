@@ -1,0 +1,7 @@
+RewriteEngine On
+RewriteRule ^rounds/([^/]+)/?$ data.php?query=round&round=$1
+RewriteRule ^rounds/?$ data.php?query=rounds
+RewriteRule ^tiers/([^/]+)/?$ data.php?query=tier&tier=$1
+RewriteRule ^tiers/?$ data.php?query=tiers
+RewriteRule ^settings/?$ data.php?query=settings
+RewriteRule ^osu_profile/([^/]+)/?$ data.php?query=osu_profile&id=$1
