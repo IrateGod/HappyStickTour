@@ -9,41 +9,115 @@ $database = new Database();
 $osuApi = new OsuApi();
 
 switch ($_GET['query']) {
+	case 'user':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getUser(); break; // get user data
+			case 'PUT': putUser(); break; // update user data
+		}
+		break;
+	case 'registrations':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getRegistrations(); break; // get all player registrations
+		}
+		break;
+	case 'registration':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getRegistration(); break; // get player registration
+			case 'PUT': putRegistration(); break; // update player registration
+			case 'POST': postRegistration(); break; // create new player registration
+			case 'DELETE': deleteRegistration(); break; // delete player registration
+		}
+		break;
 	case 'rounds':
 		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getRounds(); break;
-			case 'POST': postRound(); break;
+			case 'GET': getRounds(); break; // get all rounds
+			case 'POST': postRound(); break; // create  new round
 		}
 		break;
 	case 'round':
 		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getRound(); break;
-			case 'PUT': putRound(); break;
-			case 'DELETE': deleteRound(); break;
+			case 'GET': getRound(); break; // get round
+			case 'PUT': putRound(); break; // update round
+			case 'DELETE': deleteRound(); break; // delete round
 		}
 		break;
 	case 'tiers':
 		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getTiers(); break;
-			case 'POST': postTier(); break;
+			case 'GET': getTiers(); break; // get all tiers
+			case 'POST': postTier(); break; // create new tier
 		}
 		break;
 	case 'tier':
 		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getTier(); break;
-			case 'PUT': putTier(); break;
-			case 'DELETE': deleteTier(); break;
+			case 'GET': getTier(); break; // get tier
+			case 'PUT': putTier(); break; // update tier
+			case 'DELETE': deleteTier(); break; // delete tier
 		}
 		break;
-	case 'osu_profile':
+	case 'lobbies':
 		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getOsuProfile(); break;
+			case 'GET': getLobbies(); break; // get all lobbies
+			case 'POST': postLobbies(); break; // create new lobbies
+			case 'DELETE': deleteLobbies(); break; // delete lobbies
+		}
+		break;
+	case 'lobby':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getLobby(); break; // get lobby
+			case 'PUT': putLobby(); break; // update lobby
+		}
+		break;
+	case 'mappools':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getMappools(); break; // get all mappools
+			case 'POST': postMappool(); break; // create new mappool
+			case 'DELETE': deleteMappool(); break; // delete mappool
+		}
+		break;
+	case 'mappoolslots':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getMappoolSlots(); break; // get mappool slots
+			case 'PUT': putMappoolSlot(); break; // update mappool slot
+			case 'POST': postMappoolSlot(); break; // create mappool slot
+			case 'DELETE': deleteMappoolSlot(); break; // delete mappool slot
+		}
+		break;
+	case 'osuprofile':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getOsuProfile(); break; // get osu profile
+		}
+		break;
+	case 'osubeatmap':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getOsuBeatmap(); break; // get osu beatmap
+		}
+		break;
+	case 'osumatch':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getOsuMatch(); break; // get osu match
+		}
+		break;
+	case 'osugame':
+	 	switch ($_SERVER['REQUEST_METHOD']) {
+	 		case 'PUT': putOsuGame(); break; // update osu game
+	 	}
+	 	break;
+	case 'availability':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getAvailability(); break; // get availability
+			case 'PUT': putAvailability(); break; // update availability
 		}
 		break;
 	case 'settings':
 		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getSettings(); break;
-			case 'PUT': putSettings(); break;
+			case 'GET': getSettings(); break; // get all settings
+			case 'PUT': putSettings(); break; // update settings
+		}
+		break;
+	case 'feedback':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getFeedback(); break; // get feedback
+			case 'PUT': putFeedback(); break; // update feedback
 		}
 		break;
 }
@@ -53,6 +127,94 @@ function echoError($error, $message) {
 	$response->error = $error ? '1' : '0';
 	$response->message = $message;
 	echo json_encode($response);
+}
+
+function recalculateRound($round) {
+	global $database;
+	$db = $database->getConnection();
+
+	if (empty($round)) {
+		$stmt = $db->prepare('SELECT has_continue, continue_round, has_drop_down, drop_down_round
+			FROM rounds
+			WHERE is_first_round = 1');
+		$stmt->execute();
+		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		if (!empty($rows[0]) && !empty($rows[0]['has_continue'])) {
+			recalculateRound($rows[0]['continue_round']);
+		}
+		if (!empty($rows[0]) && !empty($rows[0]['has_drop_down'])) {
+			recalculateRound($rows[0]['drop_down_round']);
+		}
+	} else {
+		$playerAmount = 0;
+
+		$stmt = $db->prepare('SELECT player_amount, lobby_size, continue_amount
+			FROM rounds
+			WHERE has_continue = 1 AND continue_round = :continue_round');
+		$stmt->bindValue(':continue_round', $round, PDO::PARAM_INT);
+		$stmt->execute();
+		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		foreach ($rows as $row) {
+			$playerAmount += $row['player_amount'] / $row['lobby_size'] * $row['continue_amount'];
+		}
+		$stmt = $db->prepare('SELECT player_amount, lobby_size, drop_down_amount
+			FROM rounds
+			WHERE has_drop_down = 1 AND drop_down_round = :drop_down_round');
+		$stmt->bindValue(':drop_down_round', $round, PDO::PARAM_INT);
+		$stmt->execute();
+		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		foreach ($rows as $row) {
+			$playerAmount += $row['player_amount'] / $row['lobby_size'] * $row['drop_down_amount'];
+		}
+
+		$stmt = $db->prepare('UPDATE rounds
+			SET player_amount = :player_amount
+			WHERE id = :id');
+		$stmt->bindValue(':player_amount', $playerAmount, PDO::PARAM_INT);
+		$stmt->bindValue(':id', $round, PDO::PARAM_INT);
+		$stmt->execute();
+
+		$stmt = $db->prepare('SELECT has_continue, continue_round, has_drop_down, drop_down_round
+			FROM rounds
+			WHERE id = :id');
+		$stmt->bindValue(':id', $round, PDO::PARAM_INT);
+		$stmt->execute();
+		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		if (!empty($rows[0]['has_continue'])) {
+			recalculateRound($rows[0]['continue_round']);
+		}
+		if (!empty($rows[0]['has_drop_down'])) {
+			recalculateRound($rows[0]['drop_down_round']);
+		}
+	}
+}
+
+function getUser() {
+
+}
+
+function putUser() {
+
+}
+
+function getRegistrations() {
+
+}
+
+function getRegistration() {
+
+}
+
+function putRegistration() {
+
+}
+
+function postRegistration() {
+
+}
+
+function deleteRegistration() {
+
 }
 
 function getRounds() {
@@ -118,6 +280,25 @@ function postRound() {
 	echoError(0, 'Round saved');
 }
 
+function getRound() {
+	global $database;
+	$db = $database->getConnection();
+
+	$stmt = $db->prepare('SELECT id, name, lobby_size as lobbySize, best_of as bestOf, is_first_round as isFirstRound, player_amount as playerAmount, is_start_round as isStartRound, has_continue as hasContinue, continue_amount as continueAmount, continue_round as continueRound, has_drop_down as hasDropDown, drop_down_amount as dropDownAmount, drop_down_round as dropDownRound, has_elimination as hasElimination, eliminated_amount as eliminatedAmount, has_bracket_reset as hasBracketReset, mappools_released as mappoolsReleased, lobbies_released as lobbiesReleased
+		FROM rounds
+		WHERE id = :id');
+	$stmt->bindValue(':id', $_GET['round'], PDO::PARAM_INT);
+	$stmt->execute();
+	$round = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
+	$stmt = $db->prepare('SELECT id, time_from as timeFrom, time_to as timeTo
+		FROM round_times
+		WHERE round = :round');
+	$stmt->bindValue(':round', $_GET['round'], PDO::PARAM_INT);
+	$stmt->execute();
+	$round['times'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+	echo json_encode($round);
+}
+
 function putRound() {
 	global $database;
 	$db = $database->getConnection();
@@ -165,25 +346,6 @@ function putRound() {
 	echoError(0, 'Round saved');
 }
 
-function getRound() {
-	global $database;
-	$db = $database->getConnection();
-
-	$stmt = $db->prepare('SELECT id, name, lobby_size as lobbySize, best_of as bestOf, is_first_round as isFirstRound, player_amount as playerAmount, is_start_round as isStartRound, has_continue as hasContinue, continue_amount as continueAmount, continue_round as continueRound, has_drop_down as hasDropDown, drop_down_amount as dropDownAmount, drop_down_round as dropDownRound, has_elimination as hasElimination, eliminated_amount as eliminatedAmount, has_bracket_reset as hasBracketReset, mappools_released as mappoolsReleased, lobbies_released as lobbiesReleased
-		FROM rounds
-		WHERE id = :id');
-	$stmt->bindValue(':id', $_GET['round'], PDO::PARAM_INT);
-	$stmt->execute();
-	$round = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
-	$stmt = $db->prepare('SELECT id, time_from as timeFrom, time_to as timeTo
-		FROM round_times
-		WHERE round = :round');
-	$stmt->bindValue(':round', $_GET['round'], PDO::PARAM_INT);
-	$stmt->execute();
-	$round['times'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-	echo json_encode($round);
-}
-
 function deleteRound() {
 	global $database;
 	$db = $database->getConnection();
@@ -214,66 +376,6 @@ function deleteRound() {
 	echoError(0, 'Round deleted');
 }
 
-function recalculateRound($round) {
-	global $database;
-	$db = $database->getConnection();
-
-	if (empty($round)) {
-		$stmt = $db->prepare('SELECT has_continue, continue_round, has_drop_down, drop_down_round
-			FROM rounds
-			WHERE is_first_round = 1');
-		$stmt->execute();
-		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-		if (!empty($rows[0]) && !empty($rows[0]['has_continue'])) {
-			recalculateRound($rows[0]['continue_round']);
-		}
-		if (!empty($rows[0]) && !empty($rows[0]['has_drop_down'])) {
-			recalculateRound($rows[0]['drop_down_round']);
-		}
-	} else {
-		$playerAmount = 0;
-
-		$stmt = $db->prepare('SELECT player_amount, lobby_size, continue_amount
-			FROM rounds
-			WHERE has_continue = 1 AND continue_round = :continue_round');
-		$stmt->bindValue(':continue_round', $round, PDO::PARAM_INT);
-		$stmt->execute();
-		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-		foreach ($rows as $row) {
-			$playerAmount += $row['player_amount'] / $row['lobby_size'] * $row['continue_amount'];
-		}
-		$stmt = $db->prepare('SELECT player_amount, lobby_size, drop_down_amount
-			FROM rounds
-			WHERE has_drop_down = 1 AND drop_down_round = :drop_down_round');
-		$stmt->bindValue(':drop_down_round', $round, PDO::PARAM_INT);
-		$stmt->execute();
-		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-		foreach ($rows as $row) {
-			$playerAmount += $row['player_amount'] / $row['lobby_size'] * $row['drop_down_amount'];
-		}
-
-		$stmt = $db->prepare('UPDATE rounds
-			SET player_amount = :player_amount
-			WHERE id = :id');
-		$stmt->bindValue(':player_amount', $playerAmount, PDO::PARAM_INT);
-		$stmt->bindValue(':id', $round, PDO::PARAM_INT);
-		$stmt->execute();
-
-		$stmt = $db->prepare('SELECT has_continue, continue_round, has_drop_down, drop_down_round
-			FROM rounds
-			WHERE id = :id');
-		$stmt->bindValue(':id', $round, PDO::PARAM_INT);
-		$stmt->execute();
-		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-		if (!empty($rows[0]['has_continue'])) {
-			recalculateRound($rows[0]['continue_round']);
-		}
-		if (!empty($rows[0]['has_drop_down'])) {
-			recalculateRound($rows[0]['drop_down_round']);
-		}
-	}
-}
-
 function getTiers() {
 	global $database;
 	$db = $database->getConnection();
@@ -283,18 +385,6 @@ function getTiers() {
 		ORDER BY id ASC');
 	$stmt->execute();
 	echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-}
-
-function getTier() {
-	global $database;
-	$db = $database->getConnection();
-
-	$stmt = $db->prepare('SELECT id, name, lower_endpoint as lowerEndpoint, upper_endpoint as upperEndpoint, starting_round as startingRound, seed_by_rank as seedByRank, seed_by_time as seedByTime, seed_by_random as seedByRandom, sub_bonus as subBonus
-		FROM tiers
-		WHERE id = :id');
-	$stmt->bindValue(':id', $_GET['tier'], PDO::PARAM_INT);
-	$stmt->execute();
-	echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)[0]);
 }
 
 function postTier() {
@@ -316,6 +406,18 @@ function postTier() {
 	$stmt->execute();
 
 	echoError(0, 'Tier saved');
+}
+
+function getTier() {
+	global $database;
+	$db = $database->getConnection();
+
+	$stmt = $db->prepare('SELECT id, name, lower_endpoint as lowerEndpoint, upper_endpoint as upperEndpoint, starting_round as startingRound, seed_by_rank as seedByRank, seed_by_time as seedByTime, seed_by_random as seedByRandom, sub_bonus as subBonus
+		FROM tiers
+		WHERE id = :id');
+	$stmt->bindValue(':id', $_GET['tier'], PDO::PARAM_INT);
+	$stmt->execute();
+	echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)[0]);
 }
 
 function putTier() {
@@ -353,9 +455,78 @@ function deleteTier() {
 	echoError(0, 'Tier deleted');
 }
 
+function getLobbies() {
+
+}
+
+function postLobbies() {
+
+}
+
+function deleteLobbies() {
+
+}
+
+function getLobby() {
+
+}
+
+function putLobby() {
+
+}
+
+function getMappools() {
+
+}
+
+function postMappool() {
+
+}
+
+function deleteMappool() {
+
+}
+
+function getMappoolSlots() {
+
+}
+
+function putMappoolSlot() {
+
+}
+
+function postMappoolSlot() {
+
+}
+
+function deleteMappoolSlot() {
+
+}
+
 function getOsuProfile() {
 	global $osuApi;
 	echo json_encode($osuApi->getUser($_GET['id']));
+}
+
+function getOsuBeatmap() {
+	global $osuApi;
+	echo json_encode($osuApi->getBeatmap($_GET['id']));
+}
+
+function getOsuMatch() {
+
+}
+
+function putOsuGame() {
+
+}
+
+function getAvailability() {
+
+}
+
+function putAvailability() {
+
 }
 
 function getSettings() {
@@ -394,6 +565,14 @@ function putSettings() {
 	}
 
 	echoError(0, 'Settings saved');
+}
+
+function getFeedback() {
+
+}
+
+function putFeedback() {
+	
 }
 
 ?>
