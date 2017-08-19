@@ -4,9 +4,11 @@ date_default_timezone_set('UTC');
 
 require_once '../php_classes/Database.php';
 require_once '../php_classes/OsuApi.php';
+require_once '../php_classes/DiscordApi.php';
 
 $database = new Database();
 $osuApi = new OsuApi();
+$discordApi = new DiscordApi();
 
 switch ($_GET['query']) {
 	case 'user':
@@ -107,6 +109,38 @@ switch ($_GET['query']) {
 			case 'PUT': putSettings(); break; // update settings
 		}
 		break;
+	case 'discordlogin':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getDiscordLogin(); break; // get discord login uri
+			case 'POST': postDiscordLogin(); break; // try to login with access token
+		}
+		break;
+	case 'discordroles':
+		switch ($_SERVER['REQUEST_METHOD']) {
+			case 'GET': getDiscordRoles(); break; // get discord roles
+			case 'POST': postDiscordRoles(); break; // refresh discord role list
+		}
+		break;
+}
+
+function generateToken() {
+	global $database;
+	$db = $database->getConnection();
+
+	while (true) {
+		$token = str_replace('.', '', uniqid('', true));
+		$stmt = $db->prepare('SELECT COUNT(*) as rowcount
+			FROM bearer_tokens
+			WHERE token = :token');
+		$stmt->bindValue(':token', $token, PDO::PARAM_STR);
+		$stmt->execute();
+		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		if ($rows[0]['rowcount'] == '0') {
+			break;
+		}
+	}
+
+	return $token;
 }
 
 function echoError($error, $message) {
@@ -504,7 +538,7 @@ function getSettings() {
 	global $database;
 	$db = $database->getConnection();
 
-	$stmt = $db->prepare('SELECT registrations_open as registrationsOpen, registrations_from as registrationsFrom, registrations_to as registrationsTo
+	$stmt = $db->prepare('SELECT registrations_open as registrationsOpen, registrations_from as registrationsFrom, registrations_to as registrationsTo, role_admin as roleAdmin, role_headpooler as roleHeadpooler, role_mappooler as roleMappooler, role_referee as roleReferee, role_player as rolePlayer
 		FROM settings');
 	$stmt->execute();
 	echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)[0]);
@@ -534,8 +568,174 @@ function putSettings() {
 		$stmt->bindValue(':registrations_to', $body->registrationsTo, PDO::PARAM_STR);
 		$stmt->execute();
 	}
+	if (isset($body->roleAdmin)) {
+		$stmt = $db->prepare('UPDATE settings
+			SET role_admin = :role_admin');
+		$stmt->bindValue(':role_admin', $body->roleAdmin, PDO::PARAM_INT);
+		$stmt->execute();
+	}
+	if (isset($body->roleHeadpooler)) {
+		$stmt = $db->prepare('UPDATE settings
+			SET role_headpooler = :role_headpooler');
+		$stmt->bindValue(':role_headpooler', $body->roleHeadpooler, PDO::PARAM_INT);
+		$stmt->execute();
+	}
+	if (isset($body->roleMappooler)) {
+		$stmt = $db->prepare('UPDATE settings
+			SET role_mappooler = :role_mappooler');
+		$stmt->bindValue(':role_mappooler', $body->roleMappooler, PDO::PARAM_INT);
+		$stmt->execute();
+	}
+	if (isset($body->roleReferee)) {
+		$stmt = $db->prepare('UPDATE settings
+			SET role_referee = :role_referee');
+		$stmt->bindValue(':role_referee', $body->roleReferee, PDO::PARAM_INT);
+		$stmt->execute();
+	}
+	if (isset($body->rolePlayer)) {
+		$stmt = $db->prepare('UPDATE settings
+			SET role_player = :role_player');
+		$stmt->bindValue(':role_player', $body->rolePlayer, PDO::PARAM_INT);
+		$stmt->execute();
+	}
 
 	echoError(0, 'Settings saved');
+}
+
+function getDiscordLogin() {
+	global $discordApi;
+	echo json_encode(array('uri' => $discordApi->getLoginUri()));
+}
+
+function postDiscordLogin() {
+	global $database;
+	$db = $database->getConnection();
+	global $discordApi;
+
+	$body = json_decode(file_get_contents('php://input'));
+	$user = $discordApi->getUser($body->accessToken);
+	$member = $discordApi->getGuildMember($user->id);
+	$stmt = $db->prepare('SELECT id, name, color, position
+		FROM discord_roles
+		ORDER BY position DESC');
+	$stmt->execute();
+	$roles = $stmt->fetchAll(PDO::FETCH_OBJ);
+	$stmt = $db->prepare('SELECT registrations_open as registrationsOpen, registrations_from as registrationsFrom, registrations_to as registrationsTo, role_admin as roleAdmin, role_headpooler as roleHeadpooler, role_mappooler as roleMappooler, role_referee as roleReferee, role_player as rolePlayer
+		FROM settings');
+	$stmt->execute();
+	$settings = $stmt->fetchAll(PDO::FETCH_OBJ)[0];
+
+	$possibleRoles = [];
+	foreach ($member->roles as $role) {
+		if ($role == $settings->roleAdmin) {
+			$possibleRoles[] = 'ADMIN';
+			$possibleRoles[] = 'HEADPOOLER';
+			$possibleRoles[] = 'REFEREE';
+		} elseif ($role == $settings->roleHeadpooler) {
+			$possibleRoles[] = 'HEADPOOLER';
+		} elseif ($role == $settings->roleMappooler) {
+			$possibleRoles[] = 'MAPPOOLER';
+		} elseif ($role == $settings->roleReferee) {
+			$possibleRoles[] = 'REFEREE';
+		} elseif ($role == $settings->rolePlayer) {
+			$possibleRoles[] = 'PLAYER';
+		}
+	}
+	$now = strtotime(gmdate('Y-m-d H:i:s'));
+	if ($settings->registrationsOpen && $now > strtotime($settings->registrationsFrom) && $now < strtotime($settings->registrationsTo)) {
+		$possibleRoles[] = 'REGISTRATION';
+	}
+	$stmt = $db->prepare('SELECT COUNT(*) as rowcount
+		FROM registrations
+		WHERE id = :id');
+	$stmt->bindValue(':id', $user->id, PDO::PARAM_INT);
+	$stmt->execute();
+	$rows = $stmt->fetchAll(PDO::FETCH_OBJ);
+	if ($rows[0]->rowcount != '0') {
+		$possibleRoles[] = 'REGISTRATION';
+	}
+	$possibleRoles = array_values(array_unique($possibleRoles));
+
+	if (count($possibleRoles) == 1) {
+		$token = generateToken();
+		$stmt = $db->prepare('INSERT INTO bearer_tokens (token, user_id, scope)
+			VALUES (:token, :user_id, :scope)');
+		$stmt->bindValue(':token', $token, PDO::PARAM_STR);
+		$stmt->bindValue(':user_id', $user->id, PDO::PARAM_INT);
+		$stmt->bindValue(':scope', $possibleRoles[0], PDO::PARAM_STR);
+		$stmt->execute();
+
+		$response = new stdClass;
+		$response->error = '0';
+		$response->message = 'Login successfull';
+		$response->token = $token;
+		$response->scope = $possibleRoles[0];
+		echo json_encode($response);
+		return;
+	}
+
+	$body = json_decode(file_get_contents('php://input'));
+
+	if (isset($body->scope) && in_array($body->scope, $possibleRoles)) {
+		$token = generateToken();
+		$stmt = $db->prepare('INSERT INTO bearer_tokens (token, user_id, scope)
+			VALUES (:token, :user_id, :scope)');
+		$stmt->bindValue(':token', $token, PDO::PARAM_STR);
+		$stmt->bindValue(':user_id', $user->id, PDO::PARAM_INT);
+		$stmt->bindValue(':scope', $body->scope, PDO::PARAM_STR);
+		$stmt->execute();
+
+		$response = new stdClass;
+		$response->error = '0';
+		$response->message = 'Login successfull';
+		$response->token = $token;
+		$response->scope = $body->scope;
+		echo json_encode($response);
+		return;
+	}
+
+	if (count($possibleRoles) > 1) {
+		$response = new stdClass;
+		$response->error = '0';
+		$response->message = 'Multiple roles possible';
+		$response->scopes = $possibleRoles;
+		echo json_encode($response);
+		return;
+	}
+
+	echoError(1, 'Error when trying to login');
+}
+
+function getDiscordRoles() {
+	global $database;
+	$db = $database->getConnection();
+
+	$stmt = $db->prepare('SELECT id, name, color, position
+		FROM discord_roles
+		ORDER BY position DESC');
+	$stmt->execute();
+	echo json_encode($stmt->fetchAll(PDO::FETCH_OBJ));
+}
+
+function postDiscordRoles() {
+	global $database;
+	$db = $database->getConnection();
+	global $discordApi;
+
+	$roles = $discordApi->getGuildRoles();
+	$stmt = $db->prepare('TRUNCATE discord_roles');
+	$stmt->execute();
+	foreach ($roles as $role) {
+		$stmt = $db->prepare('INSERT INTO discord_roles (id, name, color, position)
+			VALUES (:id, :name, :color, :position)');
+		$stmt->bindValue(':id', $role->id, PDO::PARAM_INT);
+		$stmt->bindValue(':name', $role->name, PDO::PARAM_STR);
+		$stmt->bindValue(':color', $role->color, PDO::PARAM_INT);
+		$stmt->bindValue(':position', $role->position, PDO::PARAM_INT);
+		$stmt->execute();
+	}
+
+	echoError(0, 'Roles refreshed');
 }
 
 ?>

@@ -18,23 +18,120 @@
 				margin-bottom: 100px;
 				background-color: var(--happystick-green);
 				color: white;
+				font-size: 40px;
+			}
+			.scope-login-button {
+				margin-bottom: 10px;
+				background-color: var(--happystick-green);
+				color: white;
 			}
 			.public-login-button {
 				margin-left: 200px;
 			}
+			.countdown-number {
+				font-size: 150px;
+				color: var(--happystick-green);
+			}
+			.countdown-title {
+				color: var(--happystick-green);
+			}
 		</style>
+		<iron-ajax id="settingsAjax" url="api/settings" method="GET" on-response="_settingsResponse" auto></iron-ajax>
+		<iron-ajax id="getDiscordUriAjax" url="api/discordlogin" method="GET" on-response="_discordLogin"></iron-ajax>
+		<iron-ajax id="postDiscordLoginAjax" url="api/discordlogin" method="POST" content-type="application/json" on-response="_postDiscordLoginResponse"></iron-ajax>
 		<div class="flex layout vertical">
 			<div class="layout horizontal">
 				<div class="flex"></div>
-				<paper-button class="staff-login-button" raised on-click="discordLogin">Staff login</paper-button>
+				<paper-button class="staff-login-button" raised on-click="_getDiscordUri">Staff login</paper-button>
 			</div>
 			<div class="flex"></div>
-			<div class="layout horizontal">
-				<div class="flex"></div>
-				<paper-button class="discord-login-button" raised on-click="discordLogin">Player login</paper-button>
-				<paper-button class="public-login-button" raised on-click="publicLogin">Public Stats</paper-button>
-				<div class="flex"></div>
-			</div>
+			<template is="dom-if" if="[[showDefault]]">
+				<div class="layout horizontal">
+					<div class="flex"></div>
+					<paper-button class="discord-login-button" raised on-click="_getDiscordUri">Player login</paper-button>
+					<paper-button class="public-login-button" raised on-click="_publicLogin">Public Stats</paper-button>
+					<div class="flex"></div>
+				</div>
+			</template>
+			<template is="dom-if" if="[[showScopeChooser]]">
+				<div class="layout horizontal">
+					<div class="flex"></div>
+					<div class="layout vertical">
+						<template is="dom-repeat" items="[[scopes]]" as="scope">
+							<paper-button class="scope-login-button" raised on-click="_loginScope">[[scope]]</paper-button>
+						</template>
+					</div>
+					<div class="flex"></div>
+				</div>
+			</template>
+			<template is="dom-if" if="[[showCountdown]]">
+				<div class="layout horizontal">
+					<div class="flex"></div>
+					<div class="layout vertical" style="width:220px;">
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-number">[[countdownDays]]</div>
+							<div class="flex"></div>
+						</div>
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-title">Days</div>
+							<div class="flex"></div>
+						</div>
+					</div>
+					<div class="layout vertical" style="width:220px;">
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-number">[[countdownHours]]</div>
+							<div class="flex"></div>
+						</div>
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-title">Hours</div>
+							<div class="flex"></div>
+						</div>
+					</div>
+					<div class="layout vertical" style="width:220px;">
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-number">[[countdownMinutes]]</div>
+							<div class="flex"></div>
+						</div>
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-title">Minutes</div>
+							<div class="flex"></div>
+						</div>
+					</div>
+					<div class="layout vertical" style="width:220px;">
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-number">[[countdownSeconds]]</div>
+							<div class="flex"></div>
+						</div>
+						<div class="layout horizontal">
+							<div class="flex"></div>
+							<div class="countdown-title">Seconds</div>
+							<div class="flex"></div>
+						</div>
+					</div>
+					<div class="flex"></div>
+				</div>
+			</template>
+			<template is="dom-if" if="[[showRegistrationClosed]]">
+				<div class="layout horizontal">
+					<div class="flex"></div>
+					<div style="margin-bottom:100px;">Registrations are closed at the moment.</div>
+					<div class="flex"></div>
+				</div>
+			</template>
+			<template is="dom-if" if="[[showRegistration]]">
+				<div class="layout horizontal">
+					<div class="flex"></div>
+					<paper-button class="discord-login-button" raised on-click="_getDiscordUri">Register</paper-button>
+					<div class="flex"></div>
+				</div>
+			</template>
 		</div>
 	</template>
 	<script>
@@ -43,8 +140,145 @@
 
 			static get properties() {
 				return {
-
+					showDefault: {
+						type: Boolean,
+						value: true
+					},
+					showScopeChooser: {
+						type: Boolean,
+						value: false
+					},
+					showCountdown: {
+						type: Boolean,
+						value: false
+					},
+					showRegistrationClosed: {
+						type: Boolean,
+						value: false
+					},
+					showRegistration: {
+						type: Boolean,
+						value: false
+					}
 				};
+			}
+
+			ready() {
+				super.ready();
+				var hash = this._getHashParams();
+		    if (hash && hash.access_token) {
+		    	this.$.postDiscordLoginAjax.body = {
+		    		'accessToken': hash.access_token
+		    	};
+		    	this.$.postDiscordLoginAjax.generateRequest();
+		    }
+			}
+
+			_getHashParams() {
+				var hashParams = {};
+		    var e,
+		        a = /\+/g,  // Regex for replacing addition symbol with a space
+		        r = /([^&;=]+)=?([^&;]*)/g,
+		        d = function (s) { return decodeURIComponent(s.replace(a, " ")); },
+		        q = window.location.hash.substring(1);
+
+		    while (e = r.exec(q))
+		       hashParams[d(e[1])] = d(e[2]);
+
+		    return hashParams;
+			}
+
+			_hideEverything() {
+				this.showDefault = false;
+				this.showScopeChooser = false;
+				this.showCountdown = false;
+				this.showRegistrationClosed = false;
+				this.showRegistration = false;
+			}
+
+			_getDiscordUri() {
+				this.$.getDiscordUriAjax.generateRequest();
+			}
+
+			_discordLogin(e) {
+				if (e.detail.response) {
+					location.href = e.detail.response.uri;
+				}
+			}
+
+			_postDiscordLoginResponse(e) {
+				var response = e.detail.response;
+				console.log(response);
+				if (response.message == 'Multiple roles possible') {
+					this.scopes = response.scopes;
+					this._hideEverything();
+					this.showScopeChooser = true;
+				} else if (response.message == 'Login successfull') {
+					localStorage.setItem('token', response.token);
+					localStorage.setItem('scope', response.scope);
+					switch (response.scope) {
+						case 'ADMIN': window.location = 'admin/index.html'; break;
+						case 'HEADPOOLER': window.location = 'headpooler/index.html'; break;
+						case 'MAPPOOLER': window.location = 'mappooler/index.html'; break;
+						case 'REFEREE': window.location = 'referee/index.html'; break;
+						case 'PLAYER': window.location = 'player/index.html'; break;
+						case 'REGISTRATION': window.location = 'registration/index.html'; break;
+					}
+				}
+			}
+
+			_loginScope(e) {
+				if (e.model.scope) {
+					var hash = this._getHashParams();
+					this.$.postDiscordLoginAjax.body = {
+						'accessToken': hash.access_token,
+						'scope': e.model.scope
+					};
+					this.$.postDiscordLoginAjax.generateRequest();
+				}
+			}
+
+			_settingsResponse(e) {
+				var response = e.detail.response;
+				if (response.registrationsOpen) {
+					this.openTime = moment.utc(response.registrationsFrom);
+					this.closeTime = moment.utc(response.registrationsTo);
+					var now = moment();
+					if (now.isBefore(this.openTime)) {
+						this._hideEverything();
+						this.showCountdown = true;
+						this._countdownTick();
+					} else if (this.closeTime.isBefore(now)) {
+						this._hideEverything();
+						this.showRegistrationClosed = true;
+					} else {
+						this._hideEverything();
+						this.showRegistration = true;
+					}
+				}
+			}
+
+			_countdownTick() {
+				var now = moment();
+				if (now.isBefore(this.openTime)) {
+
+					// days
+					this.countdownDays = this.openTime.diff(now, 'days');
+
+					// hours
+					this.countdownHours = this.openTime.diff(now, 'hours') - 24 * this.countdownDays;
+
+					// minutes
+					this.countdownMinutes = this.openTime.diff(now, 'minutes') - (24 * this.countdownDays + 60 * this.countdownHours);
+
+					// seconds
+					this.countdownSeconds = this.openTime.diff(now, 'seconds') - (24 * this.countdownDays + 60 * this.countdownHours + 60 * this.countdownMinutes);
+
+					setTimeout(() => this._countdownTick(), 1000);
+				} else {
+					this._hideEverything();
+					this.showRegistration = true;
+				}
 			}
 		}
 

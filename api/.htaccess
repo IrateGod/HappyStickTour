@@ -13,3 +13,5 @@ RewriteRule ^osuprofile/([^/]+)/?$ data.php?query=osuprofile&id=$1
 RewriteRule ^osumatch/([^/]+)/?$ data.php?query=osumatch&id=$1
 RewriteRule ^osugame/([^/]+)/?$ data.php?query=osugame&id=$1
 RewriteRule ^settings/?$ data.php?query=settings
+RewriteRule ^discordlogin/?$ data.php?query=discordlogin
+RewriteRule ^discordroles/?$ data.php?query=discordroles
