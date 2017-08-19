@@ -70,16 +70,9 @@ switch ($_GET['query']) {
 	case 'mappools':
 		switch ($_SERVER['REQUEST_METHOD']) {
 			case 'GET': getMappools(); break; // get all mappools
+			case 'PUT': putMappool(); break; // update mappool
 			case 'POST': postMappool(); break; // create new mappool
 			case 'DELETE': deleteMappool(); break; // delete mappool
-		}
-		break;
-	case 'mappoolslots':
-		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getMappoolSlots(); break; // get mappool slots
-			case 'PUT': putMappoolSlot(); break; // update mappool slot
-			case 'POST': postMappoolSlot(); break; // create mappool slot
-			case 'DELETE': deleteMappoolSlot(); break; // delete mappool slot
 		}
 		break;
 	case 'osuprofile':
@@ -112,12 +105,6 @@ switch ($_GET['query']) {
 		switch ($_SERVER['REQUEST_METHOD']) {
 			case 'GET': getSettings(); break; // get all settings
 			case 'PUT': putSettings(); break; // update settings
-		}
-		break;
-	case 'feedback':
-		switch ($_SERVER['REQUEST_METHOD']) {
-			case 'GET': getFeedback(); break; // get feedback
-			case 'PUT': putFeedback(); break; // update feedback
 		}
 		break;
 }
@@ -487,22 +474,6 @@ function deleteMappool() {
 
 }
 
-function getMappoolSlots() {
-
-}
-
-function putMappoolSlot() {
-
-}
-
-function postMappoolSlot() {
-
-}
-
-function deleteMappoolSlot() {
-
-}
-
 function getOsuProfile() {
 	global $osuApi;
 	echo json_encode($osuApi->getUser($_GET['id']));
@@ -565,14 +536,6 @@ function putSettings() {
 	}
 
 	echoError(0, 'Settings saved');
-}
-
-function getFeedback() {
-
-}
-
-function putFeedback() {
-	
 }
 
 ?>

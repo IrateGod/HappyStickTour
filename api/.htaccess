@@ -1,8 +1,15 @@
 RewriteEngine On
+RewriteRule ^users/([^/]+)/?$ data.php?query=user&user=$1
+RewriteRule ^registrations/([^/]+)/?$ data.php?query=registration&registration=$1
+RewriteRule ^registrations/?$ data.php?query=registrations
 RewriteRule ^rounds/([^/]+)/?$ data.php?query=round&round=$1
 RewriteRule ^rounds/?$ data.php?query=rounds
 RewriteRule ^tiers/([^/]+)/?$ data.php?query=tier&tier=$1
 RewriteRule ^tiers/?$ data.php?query=tiers
-RewriteRule ^settings/?$ data.php?query=settings
+RewriteRule ^lobbies/([^/]+)/?$ data.php?query=lobby&lobby=$1
+RewriteRule ^lobbies/?$ data.php?query=lobbies
+RewriteRule ^mappools/?$ data.php?query=mappools
 RewriteRule ^osuprofile/([^/]+)/?$ data.php?query=osuprofile&id=$1
 RewriteRule ^osumatch/([^/]+)/?$ data.php?query=osumatch&id=$1
+RewriteRule ^osugame/([^/]+)/?$ data.php?query=osugame&id=$1
+RewriteRule ^settings/?$ data.php?query=settings
