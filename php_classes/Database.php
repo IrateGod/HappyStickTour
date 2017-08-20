@@ -16,7 +16,7 @@ class Database {
 	}
 
 	public function getConnection() {
-		$connection = new PDO('mysql:host=' . $this->database_host . ';dbname=' . $this->database_dbname, $this->database_username, $this->database_password);
+		$connection = new PDO('mysql:host=' . $this->database_host . ';dbname=' . $this->database_dbname . ';charset=utf8', $this->database_username, $this->database_password);
 		return $connection;
 	}
 
