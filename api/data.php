@@ -519,7 +519,8 @@ function getOsuBeatmap() {
 }
 
 function getOsuMatch() {
-
+	global $osuApi;
+	echo json_encode($osuApi->getMatch($_GET['id']));
 }
 
 function putOsuGame() {
